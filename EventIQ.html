@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EventIQ 🎟️ Unlock Your Entertainment</title>
+<style>
+body { font-family:'Arial',sans-serif; margin:0;padding:0; background:linear-gradient(135deg,#0a0a23,#1e3c72); color:white; }
+header { text-align:center; padding:20px; background: rgba(30,60,114,0.85);}
+header h1 { margin:0; font-size:2.2rem; }
+.marquee-container { background:#ff4081; color:white; overflow:hidden; white-space:nowrap; padding:10px 0; font-weight:bold;}
+.marquee-container span { display:inline-block; padding-right:50px; animation: marquee 20s linear infinite;}
+@keyframes marquee {0% {transform: translateX(100%);} 100% {transform: translateX(-100%);}}
+.container { max-width:1000px; margin:20px auto; background: rgba(22,22,56,0.95); padding:20px; border-radius:15px;}
+.event-card { background: rgba(30,30,70,0.85); padding:20px; border-radius:15px; margin-bottom:20px; }
+.event-card h2 { margin-top:0;}
+.btn { margin-top:10px; padding:10px 20px; border:none; border-radius:10px; cursor:pointer; background:#ffeb3b; color:#000;}
+.btn:hover { background:#ffc107; }
+.seat-grid { display:grid; grid-template-columns: repeat(10, 1fr); gap:10px; margin-top:10px;}
+.seat { padding:10px; background:#00e676; text-align:center; border-radius:5px; cursor:pointer;}
+.seat.soldout { background:#f44336; cursor:not-allowed;}
+.seat.selected { background:#ffeb3b; color:#000;}
+.filter-sort { margin-bottom:20px; }
+.filter-sort input, .filter-sort select { padding:5px 10px; margin-right:15px; border-radius:5px; border:none; }
+</style>
+</head>
+<body>
+
+<header>
+    <h1>EventIQ 🎟️ Unlock Your Entertainment</h1>
+</header>
+
+<div class="marquee-container">
+    <span>🎬 Movies | 🏏 Sports | 🎤 Stand-up Comedy | 🎶 Concerts | 🎭 Theatre | 🎨 Fine Arts & More...</span>
+</div>
+
+<div class="container filter-sort">
+    <input type="text" id="searchInput" placeholder="Search for an event..." oninput="applyFilters()">
+    <label>Category:</label>
+    <select id="filterCategory" onchange="applyFilters()">
+        <option value="All">All</option>
+        <option value="Movie">Movies</option>
+        <option value="Sport">Sports</option>
+        <option value="Comedy">Comedy</option>
+        <option value="Concert">Concerts</option>
+        <option value="FineArts">Fine Arts</option>
+    </select>
+    <label>Sort by:</label>
+    <select id="sortOption" onchange="applyFilters()">
+        <option value="None">None</option>
+        <option value="Rating">Rating (High → Low)</option>
+        <option value="Cost">Cost (Low → High)</option>
+    </select>
+</div>
+
+<div class="container" id="eventsContainer"></div>
+
+<script>
+// Event Data
+const events = [
+    {name:"Avengers: Endgame", category:"Movie", venue:"Galaxy Cinema, Mumbai", date:"5 Nov 2025", time:"7:00 PM", rating:5, cost:500},
+    {name:"Inception", category:"Movie", venue:"Galaxy Cinema, Pune", date:"8 Nov 2025", time:"6:30 PM", rating:5, cost:450},
+    {name:"The Dark Knight", category:"Movie", venue:"Galaxy Cinema, Delhi", date:"10 Nov 2025", time:"8:00 PM", rating:5, cost:480},
+    {name:"India vs Australia", category:"Sport", venue:"Wankhede Stadium, Mumbai", date:"8 Nov 2025", time:"3:00 PM", rating:5, cost:800},
+    {name:"IPL Finals", category:"Sport", venue:"M. Chinnaswamy Stadium, Bangalore", date:"12 Nov 2025", time:"7:00 PM", rating:5, cost:1200},
+    {name:"Tennis Open Finals", category:"Sport", venue:"RK Stadium, Chennai", date:"15 Nov 2025", time:"5:00 PM", rating:4, cost:600},
+    {name:"Stand-up by John Doe", category:"Comedy", venue:"Comedy Club, Pune", date:"10 Nov 2025", time:"8:00 PM", rating:4, cost:400},
+    {name:"Laugh Riot with Jane", category:"Comedy", venue:"Comedy House, Mumbai", date:"14 Nov 2025", time:"9:00 PM", rating:5, cost:450},
+    {name:"Funny Nights", category:"Comedy", venue:"Laugh Arena, Delhi", date:"18 Nov 2025", time:"7:30 PM", rating:4, cost:350},
+    {name:"Rock Concert - The Waves", category:"Concert", venue:"Open Air Arena, Bangalore", date:"12 Nov 2025", time:"9:00 PM", rating:5, cost:1000},
+    {name:"Jazz Evening", category:"Concert", venue:"City Concert Hall, Pune", date:"15 Nov 2025", time:"8:30 PM", rating:5, cost:900},
+    {name:"Pop Music Fest", category:"Concert", venue:"Music Arena, Mumbai", date:"20 Nov 2025", time:"7:00 PM", rating:4, cost:850},
+    {name:"Art Exhibition - Colors of Life", category:"FineArts", venue:"Art Gallery, Delhi", date:"10 Nov 2025", time:"11:00 AM", rating:5, cost:300},
+    {name:"Photography Showcase", category:"FineArts", venue:"Gallery Lumiere, Mumbai", date:"12 Nov 2025", time:"12:00 PM", rating:4, cost:250},
+    {name:"Sculpture Fest", category:"FineArts", venue:"City Art Center, Bangalore", date:"18 Nov 2025", time:"10:00 AM", rating:5, cost:350},
+];
+
+const eventsContainer = document.getElementById("eventsContainer");
+let selectedSeatsMap = {}; // { eventIndex: [seatNames] }
+
+// --- Voice Function ---
+function speakText(text){
+    if('speechSynthesis' in window){
+        const msg = new SpeechSynthesisUtterance(text);
+        window.speechSynthesis.speak(msg);
+    }
+}
+
+// --- Render Events ---
+function renderEvents(eventsArray){
+    eventsContainer.innerHTML="";
+    eventsArray.forEach((ev,index)=>{
+        const card = document.createElement("div");
+        card.className="event-card";
+        card.innerHTML=`
+            <h2>${ev.name}</h2>
+            <p><strong>Category:</strong> ${ev.category}</p>
+            <p><strong>Venue:</strong> ${ev.venue}</p>
+            <p><strong>Date & Time:</strong> ${ev.date}, ${ev.time}</p>
+            <p><strong>Rating:</strong> ${"★".repeat(ev.rating)}${"☆".repeat(5-ev.rating)}</p>
+            <p><strong>Cost per Ticket:</strong> ₹${ev.cost}</p>
+            <button class="btn" onclick="toggleSeat(${index}); speakText('Event: ${ev.name}. Ticket cost: ₹${ev.cost} each.')">Seat Availability</button>
+            <div class="seat-grid" id="seatGrid${index}" style="display:none;"></div>
+            <div id="selectedSeats${index}" style="margin-top:10px; color:#fff;"></div>
+            <button class="btn" onclick="bookNow(${index})">Book Now</button>
+        `;
+        eventsContainer.appendChild(card);
+        renderSeats(index);
+    });
+}
+
+// --- Toggle Seat Grid ---
+function toggleSeat(index){
+    const grid = document.getElementById("seatGrid"+index);
+    grid.style.display = grid.style.display==="none" ? "grid" : "none";
+}
+
+// --- Render Seats ---
+function renderSeats(eventIndex){
+    const seatGrid = document.getElementById("seatGrid"+eventIndex);
+    seatGrid.innerHTML="";
+    const selectedDiv = document.getElementById("selectedSeats"+eventIndex);
+    selectedDiv.innerHTML = "Selected Seats: None | Total: ₹0";
+
+    if(!selectedSeatsMap[eventIndex]) selectedSeatsMap[eventIndex] = [];
+
+    const rows=['A','B','C','D','E','F','G','H'];
+    const cols = 10;
+    for(let r=0;r<rows.length;r++){
+        for(let c=1;c<=cols;c++){
+            const seat = document.createElement('div');
+            seat.className='seat';
+            seat.innerText = rows[r]+c;
+            if(Math.random()<0.2){ seat.classList.add('soldout'); }
+            seat.onclick=function(){
+                if(seat.classList.contains('soldout')) return;
+                const seatName = seat.innerText;
+                if(seat.classList.contains('selected')){
+                    seat.classList.remove('selected');
+                    selectedSeatsMap[eventIndex] = selectedSeatsMap[eventIndex].filter(s=>s!==seatName);
+                } else{
+                    seat.classList.add('selected');
+                    selectedSeatsMap[eventIndex].push(seatName);
+                }
+                updateSelectedSeatsDisplay(eventIndex);
+            }
+            seatGrid.appendChild(seat);
+        }
+    }
+}
+
+// --- Update Selected Seats ---
+function updateSelectedSeatsDisplay(eventIndex){
+    const selectedDiv = document.getElementById("selectedSeats"+eventIndex);
+    const selectedSeats = selectedSeatsMap[eventIndex] || [];
+    const totalCost = selectedSeats.length * events[eventIndex].cost;
+    selectedDiv.innerHTML = `Selected Seats: ${selectedSeats.length ? selectedSeats.join(", ") : "None"} | Total: ₹${totalCost}`;
+}
+
+// --- Book Now ---
+function bookNow(eventIndex){
+    const selectedSeats = selectedSeatsMap[eventIndex] || [];
+    if(selectedSeats.length === 0){
+        alert("Please select seats before booking!");
+        speakText("Please select seats before booking!");
+        return;
+    }
+    const userName = prompt("Enter your Name:");
+    if(!userName || userName.trim()===""){ alert("Name is required!"); speakText("Name is required!"); return; }
+    const userPhone = prompt("Enter your Phone Number:");
+    if(!userPhone || userPhone.trim()===""){ alert("Phone Number is required!"); speakText("Phone Number is required!"); return; }
+    const userEmail = prompt("Enter your Email:");
+    if(!userEmail || userEmail.trim()===""){ alert("Email is required!"); speakText("Email is required!"); return; }
+
+    const totalCost = selectedSeats.length * events[eventIndex].cost;
+    const msg = `Booking Confirmed for ${events[eventIndex].name}. Seats: ${selectedSeats.join(", ")}. Total Cost: ₹${totalCost}. Name: ${userName}.`;
+    alert(msg);
+    speakText(msg);
+
+    selectedSeatsMap[eventIndex] = [];
+    renderSeats(eventIndex);
+}
+
+// --- Apply Filters ---
+function applyFilters(){
+    let filtered = [...events];
+    const search = document.getElementById("searchInput").value.toLowerCase();
+    const category = document.getElementById("filterCategory").value;
+    const sortOpt = document.getElementById("sortOption").value;
+
+    if(search!==""){
+        filtered = filtered.filter(ev => ev.name.toLowerCase().includes(search));
+    }
+    if(category!=="All"){
+        filtered = filtered.filter(ev => ev.category===category);
+    }
+    if(sortOpt==="Rating"){
+        filtered.sort((a,b)=>b.rating - a.rating);
+    } else if(sortOpt==="Cost"){
+        filtered.sort((a,b)=>a.cost - b.cost);
+    }
+
+    renderEvents(filtered);
+}
+
+// --- Initialize ---
+renderEvents(events);
+</script>
+
+</body>
+</html>
